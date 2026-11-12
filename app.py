@@ -5,6 +5,8 @@ from torchvision import models, transforms
 from PIL import Image
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+import gdown
+import os
 
 app = FastAPI(title="Oasis Dementia Classification API")
 
@@ -18,15 +20,22 @@ app.add_middleware(
 
 # Define class names matching training order
 CLASS_NAMES = ['Mild Dementia', 'Moderate Dementia', 'Non Demented', 'Very mild Dementia']
-
 # Setup Device & Model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = models.resnet18(weights=None)
 model.fc = nn.Linear(model.fc.in_features, 4)
 
+MODEL_PATH = "best_model.pt"
+FILE_ID = "1IR15vcwLLRoW75MYqOI57nUbTE3fwQYg"
+URL = f"https://drive.google.com/uc?id={FILE_ID}"
+
+if not os.path.exists(MODEL_PATH):
+    print("Downloading model weights from Google Drive...")
+    gdown.download(URL, MODEL_PATH, quiet=False)
+    print("Model downloaded successfully!")
+    
 # Load best_model.pt
-model_path = "best_model.pt"
-state_dict = torch.load(model_path, map_location=device)
+state_dict = torch.load(MODEL_PATH, map_location=device)
 if "model_state_dict" in state_dict:
     model.load_state_dict(state_dict["model_state_dict"])
 else:
