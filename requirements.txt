@@ -1,8 +1,12 @@
-torch
-torchvision
+# CPU-only PyTorch wheels on Linux (Render). Without this line pip pulls the
+# multi-GB CUDA build, which bloats the build and can OOM a 512 MB instance.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1
+torchvision==0.20.1
 fastapi
 uvicorn
 Pillow
-numpy
+numpy<2.3
 python-multipart
 gdown
+opencv-python-headless<4.13

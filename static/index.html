@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroScan AI</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --border: #e3e6eb; --text: #1b1f24; --muted: #5f6b7a;
+    --accent: #0e7490; --accent-soft: #e0f2f7;
+    --warn-bg: #fff7e6; --warn-border: #f3c26b; --warn-text: #7a4b00;
+    --c-non: #16a34a; --c-vmild: #ca8a04; --c-mild: #ea580c; --c-mod: #dc2626;
+    --bar-track: #eceff3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --card: #161b22; --border: #2a313c; --text: #e6edf3; --muted: #8b96a5;
+      --accent: #22b8cf; --accent-soft: #0f2a33;
+      --warn-bg: #2a2110; --warn-border: #8a6a1f; --warn-text: #f1cd7d;
+      --bar-track: #222a35;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 40px; }
+  header h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-top: 16px; }
+  .label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; }
+
+  /* Input */
+  .inputs { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button, .upload-btn {
+    font: inherit; font-size: 14px; cursor: pointer; border-radius: 8px; padding: 8px 14px;
+    border: 1px solid var(--border); background: var(--card); color: var(--text);
+  }
+  button:hover, .upload-btn:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .upload-btn { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .upload-btn:hover { filter: brightness(1.08); }
+  .sample-btn.active { border-color: var(--accent); background: var(--accent-soft); }
+  .divider { color: var(--muted); font-size: 13px; padding: 0 4px; }
+  #file-input { display: none; }
+  .drop-hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  body.dragging .card.input-card { outline: 2px dashed var(--accent); outline-offset: 4px; }
+
+  /* Images */
+  .images { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  figure { margin: 0; }
+  figure .frame {
+    position: relative; aspect-ratio: 1 / 1; background: #000; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+  }
+  figure img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  figure .placeholder { color: #8b96a5; font-size: 13px; padding: 12px; text-align: center; }
+  figcaption { font-size: 13px; color: var(--muted); margin-top: 6px; display: flex; justify-content: space-between; gap: 8px; }
+  .legend { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+  .legend .grad { width: 70px; height: 8px; border-radius: 4px;
+    background: linear-gradient(90deg, #00008f, #0050ff, #00dfff, #9fff60, #ffdf00, #ff3000, #800000); }
+  .spinner { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.45); color: #fff; font-size: 13px; }
+  .loading .spinner { display: flex; }
+
+  /* Result */
+  .result-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; }
+  .pred { font-size: 26px; font-weight: 700; margin: 0; }
+  .pred-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .metrics { display: flex; gap: 18px; text-align: right; }
+  .metric .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .metric .k { font-size: 12px; color: var(--muted); }
+  .bars { margin-top: 16px; display: grid; gap: 10px; }
+  .bar-row { display: grid; grid-template-columns: 150px 1fr 60px; align-items: center; gap: 10px; font-size: 14px; }
+  .bar-row.top { font-weight: 700; }
+  .track { height: 10px; background: var(--bar-track); border-radius: 5px; overflow: hidden; }
+  .fill { height: 100%; width: 0; border-radius: 5px; transition: width .4s ease; }
+  .pct { text-align: right; font-variant-numeric: tabular-nums; }
+  .note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; font-size: 13px;
+    background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text); }
+  .note ul { margin: 4px 0 0; padding-left: 18px; }
+  .hidden { display: none !important; }
+  .error { color: var(--c-mod); font-size: 13px; margin-top: 10px; }
+
+  /* Disclaimer + details */
+  .disclaimer { font-size: 13px; color: var(--muted); border-left: 3px solid var(--warn-border); padding: 4px 0 4px 10px; margin-top: 16px; }
+  details summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  details p { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+  .tbl-wrap { overflow-x: auto; margin-top: 10px; }
+  table { border-collapse: collapse; font-size: 13px; width: 100%; min-width: 520px; }
+  th, td { border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: right; font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; }
+  tr.deployed td { font-weight: 600; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 24px; }
+
+  @media (max-width: 600px) {
+    .images { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .bar-row { grid-template-columns: 110px 1fr 52px; font-size: 13px; }
+    .metrics { text-align: left; }
+    .pred { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>NeuroScan AI</h1>
+    <p>Dementia-stage screening on OASIS brain MRI slices &middot; ResNet-18 with Grad-CAM explanations</p>
+  </header>
+
+  <div class="disclaimer">
+    <strong>Research prototype &mdash; not a medical diagnosis.</strong>
+    Outputs are model estimates from single 2D slices and must not be used for clinical decisions.
+    Consult a qualified clinician for any assessment.
+  </div>
+
+  <!-- Input -->
+  <section class="card input-card">
+    <p class="label">Input</p>
+    <div class="inputs">
+      <label class="upload-btn" for="file-input">Upload MRI slice</label>
+      <input type="file" id="file-input" accept="image/png,image/jpeg">
+      <span class="divider">or try a sample:</span>
+      <div id="samples" class="inputs"></div>
+    </div>
+    <div class="drop-hint">PNG or JPEG, up to 10 MB. You can also drag &amp; drop an image onto the page.</div>
+  </section>
+
+  <!-- Images -->
+  <section class="card">
+    <div class="images" id="images">
+      <figure>
+        <div class="frame">
+          <img id="img-original" class="hidden" alt="Original MRI slice">
+          <div id="ph-original" class="placeholder">No image yet</div>
+          <div class="spinner">Analysing&hellip;</div>
+        </div>
+        <figcaption><span>Original</span><span id="img-name"></span></figcaption>
+      </figure>
+      <figure>
+        <div class="frame">
+          <img id="img-cam" class="hidden" alt="Grad-CAM heatmap overlay">
+          <div id="ph-cam" class="placeholder">Grad-CAM appears here</div>
+          <div class="spinner">Analysing&hellip;</div>
+        </div>
+        <figcaption>
+          <span>Grad-CAM (layer4)</span>
+          <span class="legend">low <span class="grad"></span> high</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- Result -->
+  <section class="card" id="result-card">
+    <p class="label">Prediction</p>
+    <div id="result-empty" style="color:var(--muted);font-size:14px">Upload a slice or pick a sample to run the model.</div>
+    <div id="result" class="hidden">
+      <div class="result-head">
+        <div>
+          <p class="pred" id="pred">&mdash;</p>
+          <div class="pred-sub" id="pred-sub"></div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="v" id="conf">&mdash;</div><div class="k">confidence</div></div>
+          <div class="metric"><div class="v" id="entropy">&mdash;</div><div class="k" id="entropy-k">uncertainty (entropy)</div></div>
+        </div>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="note hidden" id="warn"></div>
+      <div class="pred-sub" id="meta" style="margin-top:12px"></div>
+    </div>
+    <div class="error hidden" id="error"></div>
+  </section>
+
+  <!-- Model notes -->
+  <section class="card">
+    <details>
+      <summary>Why the baseline model? (Cross-Entropy vs. Class-Weighted vs. Focal Loss)</summary>
+      <p>
+        OASIS is heavily imbalanced (test set: 76% Non Demented, 16% Very mild, 5.5% Mild, 1.8% Moderate;
+        13,237 slices from 53 held-out subjects, split by subject). We compared three losses on the same
+        subject-level split. Per-class <em>recall</em>:
+      </p>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>Model</th><th>Non</th><th>Very mild</th><th>Mild</th><th>Moderate</th><th>Accuracy</th><th>Macro F1</th></tr>
+          </thead>
+          <tbody>
+            <tr class="deployed"><td>Cross-Entropy (deployed)</td><td>0.88</td><td>0.49</td><td>0.11</td><td>0.00</td><td>0.76</td><td>0.37</td></tr>
+            <tr><td>Class-Weighted CE</td><td>0.85</td><td>0.43</td><td>0.09</td><td>0.00</td><td>0.73</td><td>0.34</td></tr>
+            <tr><td>Focal Loss (&gamma;=2, &alpha;-weighted)</td><td>0.96</td><td>0.07</td><td>0.03</td><td>0.01</td><td>0.75</td><td>0.26</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Focal Loss reached 0.67 precision on Moderate, but only by predicting it very rarely (1% recall), and it
+        pushed most Very mild cases into Non Demented. The baseline keeps the most balanced recall and the best
+        macro F1, so it is the live model. Minority stages (Mild, Moderate) remain hard for every variant &mdash;
+        treat those predictions with extra caution.
+      </p>
+    </details>
+  </section>
+
+  <footer>FastAPI &middot; PyTorch ResNet-18 &middot; Grad-CAM &middot; OASIS-1</footer>
+</div>
+
+<script>
+  // Display order (by severity) and colours per class.
+  const CLASSES = [
+    { name: 'Non Demented',       short: 'Non Demented', color: 'var(--c-non)' },
+    { name: 'Very mild Dementia', short: 'Very mild',    color: 'var(--c-vmild)' },
+    { name: 'Mild Dementia',      short: 'Mild',         color: 'var(--c-mild)' },
+    { name: 'Moderate Dementia',  short: 'Moderate',     color: 'var(--c-mod)' },
+  ];
+  const colorOf = n => (CLASSES.find(c => c.name === n) || {}).color || 'var(--accent)';
+
+  const $ = id => document.getElementById(id);
+  const imgOrig = $('img-original'), imgCam = $('img-cam');
+  let busy = false;
+  let origObjectUrl = null;
+
+  function showImage(img, ph, src) {
+    if (src) { img.src = src; img.classList.remove('hidden'); $(ph).classList.add('hidden'); }
+    else { img.removeAttribute('src'); img.classList.add('hidden'); $(ph).classList.remove('hidden'); }
+  }
+
+  function setBusy(on) {
+    busy = on;
+    $('images').classList.toggle('loading', on);
+    document.querySelectorAll('.sample-btn').forEach(b => b.disabled = on);
+    $('file-input').disabled = on;
+  }
+
+  function showError(msg) {
+    const e = $('error');
+    e.textContent = msg || '';
+    e.classList.toggle('hidden', !msg);
+  }
+
+  function renderBars(probs, top) {
+    const bars = $('bars');
+    bars.innerHTML = '';
+    CLASSES.forEach(c => {
+      const pct = Number(probs[c.name] || 0);
+      const row = document.createElement('div');
+      row.className = 'bar-row' + (c.name === top ? ' top' : '');
+      row.innerHTML = `<span></span><div class="track"><div class="fill"></div></div><span class="pct"></span>`;
+      row.children[0].textContent = c.short;
+      row.children[2].textContent = pct.toFixed(1) + '%';
+      const fill = row.querySelector('.fill');
+      fill.style.background = c.color;
+      bars.appendChild(row);
+      requestAnimationFrame(() => { fill.style.width = Math.max(pct, 0.5) + '%'; });
+    });
+  }
+
+  function render(data) {
+    $('result-empty').classList.add('hidden');
+    $('result').classList.remove('hidden');
+
+    const pred = $('pred');
+    pred.textContent = data.prediction;
+    pred.style.color = colorOf(data.prediction);
+    const ci = data.clinical_info || {};
+    $('pred-sub').textContent = [ci.cdr, ci.description].filter(Boolean).join(' · ');
+
+    $('conf').textContent = Number(data.confidence).toFixed(1) + '%';
+    const ent = Number(data.uncertainty_entropy ?? 0);
+    $('entropy').textContent = ent.toFixed(2);
+    $('entropy-k').textContent = `uncertainty: ${data.uncertainty_level || ''}`;
+
+    renderBars(data.probabilities || {}, data.prediction);
+    showImage(imgCam, 'ph-cam', data.gradcam_overlay);
+
+    const warnings = [];
+    if (data.mri_check && !data.mri_check.is_likely_mri && data.mri_check.warning) warnings.push(data.mri_check.warning);
+    if (data.uncertainty_warning) warnings.push(data.uncertainty_warning);
+    const w = $('warn');
+    if (warnings.length) {
+      w.innerHTML = '<strong>Caution</strong><ul></ul>';
+      const ul = w.querySelector('ul');
+      warnings.forEach(t => { const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+      w.classList.remove('hidden');
+    } else {
+      w.classList.add('hidden');
+    }
+
+    $('meta').textContent = `${data.model || 'ResNet-18'} · ${data.latency_ms} ms on ${String(data.device || 'cpu').toUpperCase()}`;
+  }
+
+  async function callApi(url, opts) {
+    setBusy(true); showError('');
+    showImage(imgCam, 'ph-cam', null);
+    try {
+      const res = await fetch(url, opts);
+      let body = null;
+      try { body = await res.json(); } catch (_) {}
+      if (!res.ok) throw new Error((body && body.detail) || `Request failed (${res.status})`);
+      render(body);
+    } catch (err) {
+      showError('Analysis failed: ' + err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function runSample(s) {
+    if (busy) return;
+    document.querySelectorAll('.sample-btn').forEach(b => b.classList.toggle('active', b.dataset.id === s.id));
+    showImage(imgOrig, 'ph-original', s.thumbnail_url);
+    $('img-name').textContent = `sample: ${s.label}`;
+    callApi('/api/predict-sample', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sample_id: s.id }),
+    });
+  }
+
+  function uploadFile(file) {
+    if (busy || !file) return;
+    if (!/^image\/(png|jpe?g)$/i.test(file.type)) { showError('Please choose a PNG or JPEG image.'); return; }
+    if (file.size > 10 * 1024 * 1024) { showError('Image is larger than 10 MB.'); return; }
+    document.querySelectorAll('.sample-btn').forEach(b => b.classList.remove('active'));
+    if (origObjectUrl) URL.revokeObjectURL(origObjectUrl);
+    origObjectUrl = URL.createObjectURL(file);
+    showImage(imgOrig, 'ph-original', origObjectUrl);
+    $('img-name').textContent = file.name;
+    const fd = new FormData();
+    fd.append('file', file);
+    callApi('/api/predict', { method: 'POST', body: fd });
+  }
+
+  $('file-input').addEventListener('change', e => { uploadFile(e.target.files[0]); e.target.value = ''; });
+
+  // Page-wide drag & drop
+  let dragDepth = 0;
+  window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; document.body.classList.add('dragging'); });
+  window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+  window.addEventListener('dragover', e => e.preventDefault());
+  window.addEventListener('drop', e => {
+    e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+  });
+
+  async function init() {
+    let samples = [];
+    try {
+      const res = await fetch('/api/samples');
+      if (res.ok) samples = await res.json();
+    } catch (_) {}
+    const box = $('samples');
+    samples.forEach(s => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sample-btn';
+      b.dataset.id = s.id;
+      b.textContent = s.label;
+      b.style.borderLeft = `4px solid ${colorOf(s.expected_class)}`;
+      b.addEventListener('click', () => runSample(s));
+      box.appendChild(b);
+    });
+    if (!samples.length) box.innerHTML = '<span class="divider">(samples unavailable)</span>';
+  }
+  init();
+</script>
+</body>
+</html>
