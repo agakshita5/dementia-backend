@@ -183,12 +183,22 @@ class GradCAM:
 cam_engine = GradCAM(model, model.layer4[-1])
 
 
-def _overlay_to_data_uri(base_rgb: np.ndarray, cam: np.ndarray) -> str:
-    """Blend a JET heatmap onto the 224x224 image, weighted by CAM intensity."""
+def _overlay_to_data_uri(rgb: Image.Image, cam: np.ndarray, max_side: int = 448) -> str:
+    """Blend a JET heatmap onto the image at its original aspect ratio.
+
+    The CAM is computed on the 224x224 model input; it is resized back to the
+    image's own proportions so the overlay lines up with the original view.
+    """
+    w, h = rgb.size
+    scale = min(1.0, max_side / max(w, h))
+    out_w, out_h = max(1, round(w * scale)), max(1, round(h * scale))
+    base = np.asarray(rgb.resize((out_w, out_h), Image.BILINEAR), dtype=np.float32) / 255.0
+    cam = np.clip(cv2.resize(cam, (out_w, out_h), interpolation=cv2.INTER_CUBIC), 0, 1)
+
     heat = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
     heat = cv2.cvtColor(heat, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
     alpha = (0.55 * cam)[..., None]
-    overlay = np.clip(base_rgb * (1 - alpha) + heat * alpha, 0, 1)
+    overlay = np.clip(base * (1 - alpha) + heat * alpha, 0, 1)
     buf = io.BytesIO()
     Image.fromarray(np.uint8(overlay * 255)).save(buf, format="PNG", optimize=True)
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
@@ -281,13 +291,13 @@ def _run_inference_locked(image: Image.Image) -> Dict[str, Any]:
         "uncertainty_warning": None if level == "low" else
         f"Prediction uncertainty is {level} (normalised entropy {entropy}); the model is not confident.",
         "mri_check": check_mri_plausibility(base_rgb),
-        "gradcam_overlay": _overlay_to_data_uri(base_rgb, cam),
+        "gradcam_overlay": _overlay_to_data_uri(rgb, cam),
         "probabilities": probs_dict,
         "ranked_probabilities": ranked,
         "clinical_info": CLINICAL_INFO[pred_class],
         "latency_ms": round((time.perf_counter() - start) * 1000, 1),
         "device": str(device),
-        "model": "ResNet-18 baseline (cross-entropy)",
+        "model": "ResNet-18 baseline (class-weighted CE)",
         "disclaimer": DISCLAIMER,
     }
 

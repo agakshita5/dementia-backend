@@ -178,10 +178,10 @@
   <!-- Model notes -->
   <section class="card">
     <details>
-      <summary>Why the baseline model? (Cross-Entropy vs. Class-Weighted vs. Focal Loss)</summary>
+      <summary>Why the baseline model? (Baseline vs. extra class-weighted fine-tune vs. Focal Loss)</summary>
       <p>
         OASIS is heavily imbalanced (test set: 76% Non Demented, 16% Very mild, 5.5% Mild, 1.8% Moderate;
-        13,237 slices from 53 held-out subjects, split by subject). We compared three losses on the same
+        13,237 slices from 53 held-out subjects, split by subject). We compared three training setups on the same
         subject-level split. Per-class <em>recall</em>:
       </p>
       <div class="tbl-wrap">
@@ -190,8 +190,8 @@
             <tr><th>Model</th><th>Non</th><th>Very mild</th><th>Mild</th><th>Moderate</th><th>Accuracy</th><th>Macro F1</th></tr>
           </thead>
           <tbody>
-            <tr class="deployed"><td>Cross-Entropy (deployed)</td><td>0.88</td><td>0.49</td><td>0.11</td><td>0.00</td><td>0.76</td><td>0.37</td></tr>
-            <tr><td>Class-Weighted CE</td><td>0.85</td><td>0.43</td><td>0.09</td><td>0.00</td><td>0.73</td><td>0.34</td></tr>
+            <tr class="deployed"><td>Baseline, class-weighted CE (deployed)</td><td>0.88</td><td>0.49</td><td>0.11</td><td>0.00</td><td>0.76</td><td>0.37</td></tr>
+            <tr><td>+ extra weighted fine-tune (1 epoch)</td><td>0.85</td><td>0.43</td><td>0.09</td><td>0.00</td><td>0.73</td><td>0.34</td></tr>
             <tr><td>Focal Loss (&gamma;=2, &alpha;-weighted)</td><td>0.96</td><td>0.07</td><td>0.03</td><td>0.01</td><td>0.75</td><td>0.26</td></tr>
           </tbody>
         </table>
@@ -254,7 +254,8 @@
       const fill = row.querySelector('.fill');
       fill.style.background = c.color;
       bars.appendChild(row);
-      requestAnimationFrame(() => { fill.style.width = Math.max(pct, 0.5) + '%'; });
+      void fill.offsetWidth;  // commit the 0% width so the transition animates
+      fill.style.width = Math.max(pct, 0.5) + '%';
     });
   }
 
